@@ -1,0 +1,190 @@
+import time
+import random
+import sys
+import praw
+
+
+from readwrite_bot import reddit
+
+
+def monitorPosts():
+    visited = loadIDS()
+
+    subreddit = reddit.subreddit(SUBREDDIT_NAME)
+    start = time.perf_counter()
+    last_trim = start
+    printInfo("Bot monitoring...")
+    while time.perf_counter() - start < RUN_TIME:
+
+        if time.perf_counter() - last_trim > 60 * 60:
+            #trimIDS()
+            #visited = loadIDS()
+            last_trim = time.perf_counter()
+            printInfo("Expecting trim...")
+
+        for submission in subreddit.new(limit = NO_SUBMISSIONS):
+            submission.comments.replace_more(limit=None)
+
+            dividor = "-------------------------------"
+            post_title = submission.title
+            for key_word in KEY_WORDS:
+                if key_word in post_title.lower() and submission.id not in visited:
+
+                    try:
+                        printInfo("=======================================================")
+                        printInfo("TITLE: {}".format(post_title) + "\n" + dividor)
+                        addID(submission.id,visited)
+                        saveIDS(visited)
+
+                        response = returnResponse()
+                        submission.reply(response)
+                        printInfo("RESPONSE: {}".format(response) + "\n" + dividor)
+                        printInfo("=======================================================")
+                        time.sleep(WAIT_TIME)
+
+                    except praw.exceptions.APIException as e:
+                        print("API Exception, bot resuming in {} secs...".format(WAIT_TIME * 4))
+                        time.sleep(WAIT_TIME * 4)
+
+                    except:
+                        print("Unexpected Exception, bot resuming in {} secs...".format(WAIT_TIME * 4))
+                        time.sleep(WAIT_TIME * 4);
+
+            for top_comment in submission.comments:
+                for key_word in KEY_WORDS:
+                    comment_txt = top_comment.body
+                    if key_word in comment_txt.lower() and top_comment.id not in visited and top_comment.author.name != reddit.user.me().name:
+
+                        try:
+                            printInfo("=======================================================")
+                            printInfo("COMMENT: {}".format(comment_txt) + "\n" + dividor)
+                            addID(top_comment.id,visited)
+                            saveIDS(visited)
+
+                            response = returnResponse()
+                            top_comment.reply(response)
+                            printInfo("RESPONSE: {}".format(response) + "\n" + dividor)
+                            printInfo("=======================================================")
+                            time.sleep(WAIT_TIME)
+
+                        except praw.exceptions.APIException as e:
+                            print("API Exception, bot resuming in {} secs...".format(WAIT_TIME * 4))
+                            time.sleep(WAIT_TIME * 4)
+
+                        except:
+                            print("Unexpected Exception, bot resuming in {} secs...".format(WAIT_TIME * 4))
+                            time.sleep(WAIT_TIME * 4);
+
+    saveIDS(visited)
+    time_elapsed = time.perf_counter() - start
+    print("Bot ended. Time elapsed: {} secs".format(time_elapsed))
+
+def prelim():
+    visited = dict()
+    subreddit = reddit.subreddit(SUBREDDIT_NAME)
+    for submission in subreddit.new(limit = NO_SUBMISSIONS):
+        submission.comments.replace_more(limit=None)
+
+        for top_comment in submission.comments:
+            if top_comment.author == None:
+                continue
+
+            if top_comment.author.name == reddit.user.me().name:
+                addID(submission.id,visited)
+
+            for key_word in KEY_WORDS:
+                if key_word in top_comment.body.lower():
+
+                    #reply_names = [second_comment.author.name for second_comment in top_comment.replies]
+                    reply_names = []
+                    for second_comment in top_comment.replies:
+                        if second_comment.author == None:
+                            continue
+                        reply_names.append(second_comment.author.name)
+
+                    if reddit.user.me().name in reply_names:
+                        addID(top_comment.id,visited)
+                        break
+    return visited
+
+def printInfo(output_str):
+    print(output_str)
+    sys.stdout.flush()
+
+def addID(add_id,id_dict):
+    add_id = str(add_id)
+    if add_id in id_dict:
+        return
+    id_dict[add_id] = 0
+
+def saveIDS(id_dict):
+    with open("saved_ids.txt", mode ="w", encoding="utf-8") as write_file:
+        for key in id_dict:
+            write_file.write(str(key) + "\n")
+        write_file.close()
+
+def loadIDS():
+    id_dict = prelim()
+    with open("saved_ids.txt", mode ="r", encoding="utf-8") as read_file:
+        lines = read_file.readlines()
+        for line in lines:
+            line = line.rstrip()
+            addID(line,id_dict)
+        read_file.close()
+    return id_dict
+
+def trimIDS():
+    with open("saved_ids.txt", mode = "r", encoding ="utf-8") as read_file:
+        lines = read_file.readlines()
+        read_file.close()
+
+    trimmed_lines = list(reversed(lines))[0:NO_SUBMISSIONS]
+    trimmed_lines = list(reversed(trimmed_lines))
+    with open("saved_ids.txt", mode = "w", encoding = "utf-8") as write_file:
+        for line in trimmed_lines:
+            write_file.write(line)
+        write_file.close()
+
+    print("redundant IDS removed")
+
+
+def getAllQuotes(filename):
+    all_quotes = []
+    with open(filename,mode="r",encoding="utf-8") as read_file:
+        quotes = read_file.readlines()
+        for quote in quotes:
+            all_quotes.append(quote.rstrip())
+        read_file.close()
+    return all_quotes
+
+def returnResponse():
+    dividor = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n\n"
+    bot_tag = "*beep boop, I'm a bot*"
+
+    choice = random.randint(1,2)
+    if choice <= 1:
+        rand_index = random.randint(0,len(ALL_QUOTES)-1)
+        rand_quote = ALL_QUOTES[rand_index]
+        response = 'Urahara Quote No.{}: \n\n{}"{}" - Kisuke Urahara\n\n{}'.format(rand_index+1,dividor,rand_quote,bot_tag)
+    else:
+        rand_index = random.randint(0,len(ALL_FACTS)-1)
+        rand_fact = ALL_FACTS[rand_index]
+        response = 'Urahara Fact No.{}: \n\n{}{}\n\n{}'.format(rand_index+1,dividor,rand_fact,bot_tag)
+    return response
+
+
+QUOTES_FILENAME = "urahara_quotes.txt"
+FACTS_FILENAME = "urahara_facts.txt"
+ALL_QUOTES = getAllQuotes(QUOTES_FILENAME)
+ALL_FACTS =  getAllQuotes(FACTS_FILENAME)
+
+
+RUN_TIME = 9999999999999999999999999999999999999999999999
+SUBREDDIT_NAME = "bleach"
+KEY_WORDS = ["urahara","kisuke"]
+NO_SUBMISSIONS = 100
+WAIT_TIME = 10
+
+
+if __name__ == "__main__":
+    monitorPosts()
