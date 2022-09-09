@@ -93,8 +93,10 @@ def monitorPosts():
             dividor = "-------------------------------"
             post_title = submission.title
             for key_word in KEY_WORDS:
-                if not DEBUG and submission.author.name == reddit.user.me().name:
-                    break
+
+                if hasattr(submission, "author"):
+                    if not DEBUG and submission.author.name == reddit.user.me().name:
+                        break
 
                 if key_word in post_title.lower() and submission.id not in visited:
                     if not hasBotCommentedOnPost(submission):
@@ -123,8 +125,9 @@ def monitorPosts():
                 if (not isMentionComment(top_comment) and hasCommentLimitReached(submission)):
                     continue
 
-                if not DEBUG and top_comment.author.name == reddit.user.me().name:
-                    continue
+                if hasattr(top_comment, "author"):
+                    if not DEBUG and top_comment.author.name == reddit.user.me().name:
+                        continue
 
                 for key_word in KEY_WORDS:
                     if key_word in comment_txt.lower() and top_comment.id not in visited:
