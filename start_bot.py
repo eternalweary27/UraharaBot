@@ -1,3 +1,11 @@
+import time
+import datetime
+import random
+import sys
+import os
+import traceback
+import praw
+
 
 CLIENT_ID = None
 CLIENT_SECRET = None
@@ -13,40 +21,34 @@ reddit = praw.Reddit(
     password=REDDIT_PASSWORD
 )
 
-import time
-import datetime
-import random
-import sys
-import os
-import traceback
-import praw
-
-
-from readwrite_bot import reddit
 
 def hasBotCommentedOnPost(submission):
     for top_comment in submission.comments:
-        if hasattr(top_comment,"author"):
-            if top_comment.author.name == reddit.user.me().name:
-                return True
+        if not hasattr(top_comment,"author"):
+            continue
+        if top_comment.author.name == reddit.user.me().name:
+            return True
     return False
 
 def hasBotCommentedOnComment(comment):
     for second_comment in comment.replies:
-        if hasattr(second_comment,"author"):
-            if second_comment.author.name == reddit.user.me().name:
-                return True
+        if not hasattr(second_comment,"author"):
+            continue
+        if second_comment.author.name == reddit.user.me().name:
+            return True
     return False
 
 def hasCommentLimitReached(submission):
     comment_count = 0
     for top_comment in submission.comments:
         for second_comment in top_comment.replies:
-            if hasattr(second_comment,"author"):
-                if second_comment.author.name == reddit.user.me().name:
-                    comment_count += 1
-                    if comment_count >= COMMENT_LIMIT:
-                        return True
+            if not hasattr(second_comment,"author"):
+                continue
+            if not second_comment.author.name == reddit.user.me().name:
+                continue
+            comment_count += 1
+            if comment_count >= COMMENT_LIMIT:
+                return True
     return False
 
 def isMentionComment(comment):
@@ -91,7 +93,10 @@ def monitorPosts():
             dividor = "-------------------------------"
             post_title = submission.title
             for key_word in KEY_WORDS:
-                if key_word in post_title.lower() and submission.id not in visited and submission.author.name != reddit.user.me().name:
+                if not DEBUG and submission.author.name == reddit.user.me().name:
+                    break
+
+                if key_word in post_title.lower() and submission.id not in visited:
                     if not hasBotCommentedOnPost(submission):
                         try:
                             response = returnResponse()
@@ -117,9 +122,12 @@ def monitorPosts():
                 comment_txt = top_comment.body
                 if (not isMentionComment(top_comment) and hasCommentLimitReached(submission)):
                     continue
-                #time.sleep(2)
+
+                if not DEBUG and top_comment.author.name == reddit.user.me().name:
+                    continue
+
                 for key_word in KEY_WORDS:
-                    if key_word in comment_txt.lower() and top_comment.id not in visited and top_comment.author.name != reddit.user.me().name:
+                    if key_word in comment_txt.lower() and top_comment.id not in visited:
                         if not hasBotCommentedOnComment(top_comment):
                             try:
                                 response = returnResponse()
@@ -216,13 +224,19 @@ COMMENT_LIMIT = 5
 POST_FREQUENCY = 3600 * 24
 WAIT_TIME = 10
 
+DEBUG = False #when in debug mode, the bot can reply to its own comments and make replies on its own posts
+
 if __name__ == "__main__":
-    ls = reddit.subreddit("test").flair.templates
+    """ls = reddit.subreddit("test").flair.templates
     print(ls)
-    """for submission in reddit.redditor("uraharaBot").submissions.new(limit = 5):
+    for submission in reddit.redditor("uraharaBot").submissions.new(limit = 5):
         if submission.title == "The incalculable schemer":
             print(isinstance(submission.link_flair_template_id,str))
             print(submission.link_flair_template_id)
             import pprint
             pprint.pprint(vars(submission))"""
+    if DEBUG:
+        printInfo("DEBUG MODE STARTED...")
+        SUBREDDIT_NAME = "uraharaBot"
+        COMMENT_LIMIT = 3
     monitorPosts()
