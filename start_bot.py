@@ -24,7 +24,7 @@ reddit = praw.Reddit(
 
 def hasBotCommentedOnPost(submission):
     for top_comment in submission.comments:
-        if not hasattr(top_comment,"author"):
+        if not hasattr(top_comment.author,"name"):
             continue
         if top_comment.author.name == reddit.user.me().name:
             return True
@@ -32,7 +32,7 @@ def hasBotCommentedOnPost(submission):
 
 def hasBotCommentedOnComment(comment):
     for second_comment in comment.replies:
-        if not hasattr(second_comment,"author"):
+        if not hasattr(second_comment.author,"name"):
             continue
         if second_comment.author.name == reddit.user.me().name:
             return True
@@ -42,7 +42,7 @@ def hasCommentLimitReached(submission):
     comment_count = 0
     for top_comment in submission.comments:
         for second_comment in top_comment.replies:
-            if not hasattr(second_comment,"author"):
+            if not hasattr(second_comment.author,"name"):
                 continue
             if not second_comment.author.name == reddit.user.me().name:
                 continue
@@ -94,7 +94,7 @@ def monitorPosts():
             post_title = submission.title
             for key_word in KEY_WORDS:
 
-                if hasattr(submission, "author"):
+                if hasattr(submission.author, "name"):
                     if not DEBUG and submission.author.name == reddit.user.me().name:
                         break
 
@@ -125,7 +125,7 @@ def monitorPosts():
                 if (not isMentionComment(top_comment) and hasCommentLimitReached(submission)):
                     continue
 
-                if hasattr(top_comment, "author"):
+                if hasattr(top_comment.author, "name"):
                     if not DEBUG and top_comment.author.name == reddit.user.me().name:
                         continue
 
