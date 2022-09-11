@@ -60,18 +60,18 @@ def isMentionComment(comment):
 def postImage():
     account_username = reddit.user.me().name
     for submission in reddit.redditor(account_username).submissions.new(limit = 5):
-        if True:
-            date = datetime.datetime.fromtimestamp(submission.created_utc)
-            dif = datetime.datetime.utcnow() - date
-            if dif < datetime.timedelta(seconds=POST_FREQUENCY):
-                return
-
-            post_title = "Daily Dose of Urahara"
-            random_image = "./urahara_art/" + random.choice([filename for filename in os.listdir("./urahara_art") if filename.lower().endswith("jpg") or filename.lower().endswith("png")])
-            reddit.subreddit(SUBREDDIT_NAME).submit_image(post_title, random_image, flair_id = "a9a69882-6e92-11ec-8100-ce1e12c4bd6a")
-            os.remove(random_image)
-            printInfo("Image Post Made, File Removed: " + random_image)
+        date = datetime.datetime.fromtimestamp(submission.created_utc)
+        dif = datetime.datetime.utcnow() - date
+        if dif < datetime.timedelta(seconds=POST_FREQUENCY):
             return
+
+        post_title = "Daily Dose of Urahara"
+        random_image = "./urahara_art/" + random.choice([filename for filename in os.listdir("./urahara_art") if filename.lower().endswith("jpg") or filename.lower().endswith("png")])
+        reddit.subreddit(SUBREDDIT_NAME).submit_image(post_title, random_image, flair_id = "a9a69882-6e92-11ec-8100-ce1e12c4bd6a")
+        os.remove(random_image)
+        printInfo("Image Post Made, File Removed: " + random_image)
+        time.sleep(WAIT_TIME)
+        return
 
 
 def monitorPosts():
