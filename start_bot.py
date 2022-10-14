@@ -7,20 +7,7 @@ import traceback
 import praw
 
 
-CLIENT_ID = None
-CLIENT_SECRET = None
-USER_AGENT = None
-REDDIT_USERNAME = None
-REDDIT_PASSWORD = None
-
-reddit = praw.Reddit(
-    client_id=CLIENT_ID,
-    client_secret=CLIENT_SECRET,
-    user_agent=USER_AGENT,
-    username = REDDIT_USERNAME,
-    password=REDDIT_PASSWORD
-)
-
+from readwrite_bot import reddit
 
 def hasBotCommentedOnPost(submission):
     for top_comment in submission.comments:
@@ -65,9 +52,19 @@ def postImage():
         if dif < datetime.timedelta(seconds=POST_FREQUENCY):
             return
 
+        supported_img_types = ["png","jpg","jpeg","gif","bmp"]
+
         post_title = "Daily Dose of Urahara"
-        random_image = "./urahara_art/" + random.choice([filename for filename in os.listdir("./urahara_art") if filename.lower().endswith("jpg") or filename.lower().endswith("png")])
-        reddit.subreddit(SUBREDDIT_NAME).submit_image(post_title, random_image, flair_id = "a9a69882-6e92-11ec-8100-ce1e12c4bd6a")
+        post_id = "a9a69882-6e92-11ec-8100-ce1e12c4bd6a"
+        random_image = "./urahara_art/" + random.choice([filename for filename in os.listdir("./urahara_art") if any(filename.endswith(extension) for extension in supported_img_types)])
+
+        if "fanart" in random_image:
+            #fanart images must be in the format "fanart#<source>#<nameOfFile>" to be properly credited.
+            fanart_credit = random_image.split("#")[1]
+            post_title += " (Credit: {})".format(fanart_credit)
+            post_id = "a807e9e8-47e2-11ed-bef4-3a6a99e74d02"
+
+        reddit.subreddit(SUBREDDIT_NAME).submit_image(post_title, random_image, flair_id = post_id)
         os.remove(random_image)
         printInfo("Image Post Made, File Removed: " + random_image)
         time.sleep(WAIT_TIME)
@@ -85,8 +82,6 @@ def monitorPosts():
 
     run_bot = True
     while run_bot:
-        if len(visited) > 100:
-            visited = dict()
 
         for submission in subreddit.new(limit = NO_SUBMISSIONS):
             submission.comments.replace_more(limit=None)
@@ -151,10 +146,11 @@ def monitorPosts():
                                 printInfo("Unexpected Exception, bot resuming in {} secs...".format(WAIT_TIME))
                                 traceback.print_exc()
                                 time.sleep(WAIT_TIME);
-        try:
-            postImage()
-        except:
-            traceback.print_exc()
+        if POST_FREQUENCY > 0:
+            try:
+                postImage()
+            except:
+                traceback.print_exc()
 
         time_since_update = time.perf_counter() - last_update
         if time_since_update > update_frequency:
@@ -167,6 +163,7 @@ def monitorPosts():
             printInfo("Routine Update:")
             printInfo("Comments made over the last {} minutes: {}".format(time_str,len(visited)))
             last_update = time.perf_counter()
+            visited = dict()
 
 
         if RUN_TIME == -1:
@@ -242,4 +239,5 @@ if __name__ == "__main__":
         printInfo("DEBUG MODE STARTED...")
         SUBREDDIT_NAME = "uraharaBot"
         COMMENT_LIMIT = 3
+        POST_FREQUENCY = 60 * 2
     monitorPosts()
