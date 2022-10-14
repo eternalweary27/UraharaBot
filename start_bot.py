@@ -7,7 +7,19 @@ import traceback
 import praw
 
 
-from readwrite_bot import reddit
+CLIENT_ID = None
+CLIENT_SECRET = None
+USER_AGENT = None
+REDDIT_USERNAME = None
+REDDIT_PASSWORD = None
+
+reddit = praw.Reddit(
+    client_id=CLIENT_ID,
+    client_secret=CLIENT_SECRET,
+    user_agent=USER_AGENT,
+    username = REDDIT_USERNAME,
+    password=REDDIT_PASSWORD
+)
 
 def hasBotCommentedOnPost(submission):
     for top_comment in submission.comments:
