@@ -201,12 +201,12 @@ def returnResponse(user_text):
         try:
             AIResponse = AIResponseGenerator.getResponse(user_text)
             bot_reply = AIResponse['choices'][0]['message']
+
+            if AIResponse['choices'][0]['finish_reason'] != 'stop':
+                api_call_failed = True
         except:
             api_call_failed = True
     
-    if AIResponse['choices'][0]['finish_reason'] != 'stop':
-        api_call_failed = True
-
     if 0.7 < rand_var <= 0.85 or api_call_failed:
         bot_reply = ALL_QUOTES[random.randint(0,len(ALL_QUOTES)-1)]
 
