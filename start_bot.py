@@ -200,7 +200,7 @@ def returnResponse(user_text):
     if rand_var <= 0.7:
         try:
             AIResponse = AIResponseGenerator.getResponse(user_text)
-            bot_reply = AIResponse['choices'][0]['message']
+            bot_reply = AIResponse['choices'][0]['message']['content']
 
             if AIResponse['choices'][0]['finish_reason'] != 'stop':
                 api_call_failed = True
