@@ -6,20 +6,8 @@ import os
 import traceback
 import praw
 
-
-CLIENT_ID = None
-CLIENT_SECRET = None
-USER_AGENT = None
-REDDIT_USERNAME = None
-REDDIT_PASSWORD = None
-
-reddit = praw.Reddit(
-    client_id=CLIENT_ID,
-    client_secret=CLIENT_SECRET,
-    user_agent=USER_AGENT,
-    username = REDDIT_USERNAME,
-    password=REDDIT_PASSWORD
-)
+from readwrite_bot import reddit
+from ResponseGenerator import AICharacterResponseGenerator
 
 def hasBotCommentedOnPost(submission):
     for top_comment in submission.comments:
@@ -38,7 +26,7 @@ def hasBotCommentedOnComment(comment):
     return False
 
 def hasCommentLimitReached(submission):
-    comment_count = 0
+    comment_count = 1 if any([keyword in submission.title.lower() for keyword in KEY_WORDS]) else 0
     for top_comment in submission.comments:
         for second_comment in top_comment.replies:
             if not hasattr(second_comment.author,"name"):
@@ -91,7 +79,6 @@ def monitorPosts():
     last_update = time.perf_counter()
     start_time = time.perf_counter()
 
-
     run_bot = True
     while run_bot:
 
@@ -108,7 +95,7 @@ def monitorPosts():
                 if key_word in post_title.lower() and submission.id not in visited:
                     if not hasBotCommentedOnPost(submission):
                         try:
-                            response = returnResponse()
+                            response = returnResponse(post_title)
                             submission.reply(response)
                             addID(submission.id,visited)
 
@@ -140,7 +127,7 @@ def monitorPosts():
                     if key_word in comment_txt.lower() and top_comment.id not in visited:
                         if not hasBotCommentedOnComment(top_comment):
                             try:
-                                response = returnResponse()
+                                response = returnResponse(comment_txt)
                                 top_comment.reply(response)
                                 addID(top_comment.id,visited)
 
@@ -177,14 +164,12 @@ def monitorPosts():
             last_update = time.perf_counter()
             visited = dict()
 
-
         if RUN_TIME == -1:
             continue
         else:
             curr_time = time.perf_counter()
             time_elapsed = curr_time - start_time
             run_bot = time_elapsed < RUN_TIME
-
 
 
 def printInfo(output_str):
@@ -206,19 +191,25 @@ def getAllLines(filename):
         read_file.close()
     return all_lines
 
-def returnResponse():
-    dividor = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n\n"
+def returnResponse(user_text):
     bot_tag = "*beep boop, I'm a bot*"
 
-    choice = random.randint(1,2)
-    if choice <= 1:
-        rand_index = random.randint(0,len(ALL_QUOTES)-1)
-        rand_quote = ALL_QUOTES[rand_index]
-        response = 'Urahara Quote No.{}: \n\n{}"{}" - Kisuke Urahara\n\n{}'.format(rand_index+1,dividor,rand_quote,bot_tag)
-    else:
-        rand_index = random.randint(0,len(ALL_FACTS)-1)
-        rand_fact = ALL_FACTS[rand_index]
-        response = 'Urahara Fact No.{}: \n\n{}{}\n\n{}'.format(rand_index+1,dividor,rand_fact,bot_tag)
+    bot_reply = ""
+    api_call_failed = False
+    rand_var = random.uniform(0,1)
+    if rand_var <= 0.7:
+        try:
+            bot_reply = AIResponseGenerator.getResponse(user_text)
+        except:
+            api_call_failed = True
+
+    if 0.7 < rand_var <= 0.85 or api_call_failed:
+        bot_reply = ALL_QUOTES[random.randint(0,len(ALL_QUOTES)-1)]
+
+    if 0.85 < rand_var <= 1.0 or api_call_failed:
+        bot_reply = ALL_FACTS[random.randint(0,len(ALL_FACTS)-1)]
+
+    response = '{}\n\n{}'.format(bot_reply,bot_tag)
     return response
 
 
@@ -226,14 +217,15 @@ QUOTES_FILENAME = "urahara_quotes.txt"
 FACTS_FILENAME = "urahara_facts.txt"
 ALL_QUOTES = getAllLines(QUOTES_FILENAME)
 ALL_FACTS =  getAllLines(FACTS_FILENAME)
+AIResponseGenerator = AICharacterResponseGenerator(model="gpt-3.5-turbo",character="Kisuke Urahara from the anime Bleach", max_response_size=210)
 
 
 RUN_TIME = -1
 SUBREDDIT_NAME = "bleach"
 KEY_WORDS = ["urahara","kisuke"]
 NO_SUBMISSIONS = 15
-COMMENT_LIMIT = 5
-POST_FREQUENCY = 3600 * 24
+COMMENT_LIMIT = 3
+POST_FREQUENCY = -1 #3600 * 24
 WAIT_TIME = 10
 
 DEBUG = False #when in debug mode, the bot can reply to its own comments and make replies on its own posts
@@ -251,5 +243,5 @@ if __name__ == "__main__":
         printInfo("DEBUG MODE STARTED...")
         SUBREDDIT_NAME = "uraharaBot"
         COMMENT_LIMIT = 3
-        POST_FREQUENCY = 60 * 2
+        POST_FREQUENCY = -1 #60 * 2
     monitorPosts()
