@@ -58,4 +58,4 @@ class AICharacterResponseGenerator:
         response = openai.ChatCompletion.create(model=self.model,messages=self.chat_history)
         assistant_message = {"role": "assistant", "content": response.choices[0].message.content}
         self.chat_history.append(assistant_message)
-        return assistant_message["content"]
+        return response
