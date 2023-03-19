@@ -9,7 +9,11 @@ class AICharacterResponseGenerator:
         self.model = model
         self.character = character
         self.max_response_size = max_response_size
-        self.chat_history = [{"role": "system", "content": "Starting ChatGPT"}]
+        self.chat_history = []
+        self.resetChatHistory()
+
+    def resetChatHistory(self):
+         self.chat_history = [{"role": "system", "content": "Starting ChatGPT"}]
 
     def updateResponseMode(self, initial_prompt):
         self.chat_history += [
@@ -33,15 +37,15 @@ class AICharacterResponseGenerator:
         response_style = None
         if response_mode == "Chat":
             response_style = "in a {} way with a {} undertone"
-            primary = ["goofy and witty", "comical and clever", "wacky and eccentric", "deriding and taunting"]
-            secondary = ["cheerful", "sinister", "mysterious", "sarcastic", "facetious", "laid-back", "optimistic"]
+            primary = ["goofy and witty", "comical and clever", "wacky and eccentric", "deriding and taunting", "silly and ridiculous", "snarky and playful"]
+            secondary = ["cheerful", "sinister", "mysterious", "dark", "sarcastic", "facetious", "laid-back", "optimistic", "chaotic", "unhinged"]
             response_style = response_style.format(primary[random.randint(0,len(primary)-1)], secondary[random.randint(0,len(secondary)-1)])
 
         elif response_mode == "Joke":
             response_style = "with a relevant joke"
 
         elif response_mode == "Fact":
-            response_style = "with a fun and relevant fact"
+            response_style = "with a fun and relevant fact or trivia"
 
         else:
             raise Exception("Unsupported Response Mode")
