@@ -40,9 +40,55 @@ def hasCommentLimitReached(submission):
 
 def isMentionComment(comment):
     comment_txt = comment.body
-    mention_words = ["uraharabot", "urahara bot"]
-    return any([word in comment_txt.lower() for word in mention_words])
+    return any([word in comment_txt.lower() for word in BOTINVOKE_WORDS])
 
+def isTextSafe(user_text):
+    user_text = "".join(char for char in user_text if char.isalpha() or char in " ")
+    for word in ALL_BLACKLISTED:
+        if len(word.split()) > 1 and word in user_text.lower():
+            return False
+
+        if len(word.split()) == 1 and word in user_text.lower().split():
+            return False
+    return True
+
+def getAllLines(filename):
+    all_lines = []
+    with open(filename,mode="r",encoding="utf-8") as read_file:
+        lines = read_file.readlines()
+        for line in lines:
+            all_lines.append(line.rstrip())
+        read_file.close()
+    return all_lines
+
+def getQuarantinedUsers():
+    all_records = getAllLines(QUARANTINED_FILENAME)
+    for i in range(len(all_records)-1, -1, -1):
+        record = all_records[i].split(",")
+        quarantined_date = datetime.datetime.strptime(record[1], "%Y-%m-%d %H:%M:%S.%f")
+        quarantine_time_elapsed = (datetime.datetime.now() - quarantined_date).total_seconds()
+
+        if quarantine_time_elapsed > QUARANTINE_TIME:
+            all_records.pop(i)
+    return all_records
+
+def isUserQuarantined(user):
+    quarantined_users = getQuarantinedUsers()
+    usernames = [record.split(",")[0] for record in quarantined_users]
+    return user.name in usernames
+
+def updateQuarantinedUsers(user = None):
+    if user and isUserQuarantined(user):
+        return
+
+    quarantined_users = getQuarantinedUsers()
+    if user:
+        new_record = f"{user.name},{datetime.datetime.now()}"
+        quarantined_users.append(new_record)
+    with open(QUARANTINED_FILENAME, mode="w", encoding="utf-8") as write_file:
+        for record in quarantined_users:
+            write_file.write(record + "\n")
+        write_file.close()
 
 def postImage():
     account_username = reddit.user.me().name
@@ -70,11 +116,11 @@ def postImage():
         time.sleep(WAIT_TIME)
         return
 
-
 def monitorPosts():
     printInfo("Bot monitoring...")
     subreddit = reddit.subreddit(SUBREDDIT_NAME)
     visited = dict()
+    updateQuarantinedUsers()
     update_frequency = 3600
     last_update = time.perf_counter()
     start_time = time.perf_counter()
@@ -93,7 +139,15 @@ def monitorPosts():
                         break
 
                 if key_word in post_title.lower() and submission.id not in visited:
-                    if not hasBotCommentedOnPost(submission):
+                    if not isTextSafe(post_title) or isUserQuarantined(submission.author):
+                        addID(submission.id,visited)
+                        updateQuarantinedUsers(submission.author)
+
+                        printInfo("=======================================================")
+                        printInfo("POST SKIPPED: {}".format(post_title) + "\n")
+                        printInfo("=======================================================")
+
+                    elif not hasBotCommentedOnPost(submission):
                         try:
                             response = returnResponse(post_title)
                             submission.reply(response)
@@ -125,7 +179,15 @@ def monitorPosts():
 
                 for key_word in KEY_WORDS:
                     if key_word in comment_txt.lower() and top_comment.id not in visited:
-                        if not hasBotCommentedOnComment(top_comment):
+                        if not isTextSafe(comment_txt) or isUserQuarantined(top_comment.author):
+                            addID(top_comment.id,visited)
+                            updateQuarantinedUsers(top_comment.author)
+
+                            printInfo("=======================================================")
+                            printInfo("COMMENT SKIPPED: {}".format(comment_txt) + "\n")
+                            printInfo("=======================================================")
+
+                        elif not hasBotCommentedOnComment(top_comment):
                             try:
                                 response = returnResponse(comment_txt)
                                 top_comment.reply(response)
@@ -159,10 +221,12 @@ def monitorPosts():
                 seconds_elapsed = "0" + seconds_elapsed
             time_str = minutes_elapsed + ":" + seconds_elapsed
 
-            printInfo("Routine Update:")
-            printInfo("Comments made over the last {} minutes: {}".format(time_str,len(visited)))
             last_update = time.perf_counter()
             visited = dict()
+            updateQuarantinedUsers()
+
+            printInfo("Routine Update:")
+            printInfo("Comments made over the last {} minutes: {}".format(time_str,len(visited)))
 
         if RUN_TIME == -1:
             continue
@@ -182,35 +246,37 @@ def addID(id_item,id_dict):
         return
     id_dict[id_item] = 0
 
-def getAllLines(filename):
-    all_lines = []
-    with open(filename,mode="r",encoding="utf-8") as read_file:
-        lines = read_file.readlines()
-        for line in lines:
-            all_lines.append(line.rstrip())
-        read_file.close()
-    return all_lines
 
 def returnResponse(user_text):
     bot_tag = "*beep boop, I'm a bot*"
 
     bot_reply = ""
     api_call_failed = False
-    rand_var = random.uniform(0,1)
-    if rand_var <= 0.7:
-        try:
-            AIResponse = AIResponseGenerator.getResponse(user_text)
-            bot_reply = AIResponse['choices'][0]['message']['content']
+    try:
+        AIResponse = AIResponseGenerator.getResponse(user_text)
+        bot_reply = AIResponse['choices'][0]['message']['content']
 
-            if AIResponse['choices'][0]['finish_reason'] != 'stop':
-                api_call_failed = True
-        except:
-            api_call_failed = True
-    
-    if 0.7 < rand_var <= 0.85 or api_call_failed:
+        api_call_failed = AIResponse['choices'][0]['finish_reason'] != 'stop'
+    except:
+        api_call_failed = True
+
+    reset_chat_history = False
+    if api_call_failed:
+        reset_chat_history = True
+        print("ChatGPT API Call Failed")
+
+    if len(AIResponseGenerator.chat_history) > 16:
+        reset_chat_history = True
+
+    if reset_chat_history:
+        AIResponseGenerator.resetChatHistory()
+        print("ChatGPT History Reset")
+
+    rand_var = random.uniform(0,1)
+    if rand_var <= 0.5 and api_call_failed:
         bot_reply = ALL_QUOTES[random.randint(0,len(ALL_QUOTES)-1)]
 
-    if 0.85 < rand_var <= 1.0 or api_call_failed:
+    if rand_var > 0.5 and api_call_failed:
         bot_reply = ALL_FACTS[random.randint(0,len(ALL_FACTS)-1)]
 
     response = '{}\n\n{}'.format(bot_reply,bot_tag)
@@ -219,15 +285,20 @@ def returnResponse(user_text):
 
 QUOTES_FILENAME = "urahara_quotes.txt"
 FACTS_FILENAME = "urahara_facts.txt"
+BLACKLISTED_FILENAME = "blacklist.txt"
+QUARANTINED_FILENAME = "quarantined_users.txt"
 ALL_QUOTES = getAllLines(QUOTES_FILENAME)
 ALL_FACTS =  getAllLines(FACTS_FILENAME)
+ALL_BLACKLISTED = getAllLines(BLACKLISTED_FILENAME)
+QUARANTINE_TIME = 3600 * 24 * 5
 AIResponseGenerator = AICharacterResponseGenerator(model="gpt-3.5-turbo",character="Kisuke Urahara from the anime Bleach", max_response_size=210)
 
 
 RUN_TIME = -1
 SUBREDDIT_NAME = "bleach"
 KEY_WORDS = ["urahara","kisuke"]
-NO_SUBMISSIONS = 15
+BOTINVOKE_WORDS = ["uraharabot", "urahara bot"]
+NO_SUBMISSIONS = 30
 COMMENT_LIMIT = 3
 POST_FREQUENCY = -1 #3600 * 24
 WAIT_TIME = 10
