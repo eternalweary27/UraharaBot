@@ -22,15 +22,8 @@ class AICharacterResponseGenerator:
         ]
 
     def getRandomResponseMode(self):
-        rand_var = random.uniform(0,1)
-        if (rand_var <= 0.65):
-            return "Chat"
-
-        if (0.65 < rand_var <= 0.825):
-            return "Joke"
-
-        if (rand_var > 0.825):
-            return "Fact"
+        all_response_modes = ["Chat","Joke","Fact","SalesPitch"]
+        return random.choice(all_response_modes)
 
     def getRandomPromptMessage(self, response_mode):
         prompt_message = "Respond to all following messages as if you were {}. Respond {}. Keep the responses to a maximum of {} characters."
@@ -46,6 +39,9 @@ class AICharacterResponseGenerator:
 
         elif response_mode == "Fact":
             response_style = "with a fun and relevant fact or trivia"
+        
+        elif response_mode == "SalesPitch":
+            response_style = "with a relevant sales pitch"
 
         else:
             raise Exception("Unsupported Response Mode")
