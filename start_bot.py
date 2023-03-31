@@ -221,12 +221,12 @@ def monitorPosts():
                 seconds_elapsed = "0" + seconds_elapsed
             time_str = minutes_elapsed + ":" + seconds_elapsed
 
+            printInfo("Routine Update:")
+            printInfo("Comments made over the last {} minutes: {}".format(time_str,len(visited)))
+            
             last_update = time.perf_counter()
             visited = dict()
             updateQuarantinedUsers()
-
-            printInfo("Routine Update:")
-            printInfo("Comments made over the last {} minutes: {}".format(time_str,len(visited)))
 
         if RUN_TIME == -1:
             continue
@@ -234,7 +234,6 @@ def monitorPosts():
             curr_time = time.perf_counter()
             time_elapsed = curr_time - start_time
             run_bot = time_elapsed < RUN_TIME
-
 
 def printInfo(output_str):
     print(output_str)
