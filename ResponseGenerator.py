@@ -3,11 +3,24 @@ import random
 
 openai.api_key = None
 
+class ResponseMode:
+    def __init__(self,name,response_style, probability):
+        self.name = name
+        self.response_style = response_style
+        self.probability = probability
+
+class CharacterSettings:
+    def __init__(self, character_name, primary_traits, secondary_traits, response_modes):
+        self.character_name = character_name
+        self.primary_traits = primary_traits
+        self.secondary_traits = secondary_traits
+        self.response_modes = response_modes
+
 
 class AICharacterResponseGenerator:
-    def __init__(self,model, character, max_response_size):
+    def __init__(self,model, character_settings, max_response_size):
         self.model = model
-        self.character = character
+        self.character_settings = character_settings
         self.max_response_size = max_response_size
         self.chat_history = []
         self.resetChatHistory()
@@ -22,35 +35,36 @@ class AICharacterResponseGenerator:
         ]
 
     def getRandomResponseMode(self):
-        all_response_modes = ["Chat","Joke","Fact","SalesPitch"]
+        all_response_modes = []
+        for response_mode in self.character_settings.response_modes:
+            all_response_modes += [response_mode] * int(response_mode.probability)
         return random.choice(all_response_modes)
 
     def getRandomPromptMessage(self, response_mode):
         prompt_message = "Respond to all following messages as if you were {}. Respond {}. Keep the responses to a maximum of {} characters."
         response_style = None
-        if response_mode == "Chat":
-            response_style = "in a {} way with a {} undertone"
-            primary = ["goofy and witty", "comical and clever", "wacky and eccentric", "deriding and taunting", "silly and ridiculous", "snarky and playful"]
-            secondary = ["cheerful", "sinister", "mysterious", "dark", "sarcastic", "facetious", "laid-back", "optimistic", "chaotic", "unhinged"]
-            response_style = response_style.format(primary[random.randint(0,len(primary)-1)], secondary[random.randint(0,len(secondary)-1)])
-
-        elif response_mode == "Joke":
-            response_style = "with a relevant joke"
-
-        elif response_mode == "Fact":
-            response_style = "with a fun and relevant fact or trivia"
-        
-        elif response_mode == "SalesPitch":
-            response_style = "with a relevant sales pitch"
-
+        if response_mode.name == "Chat":
+            response_style = f"in a {random.choice(self.character_settings.primary_traits)} way with a {random.choice(self.character_settings.secondary_traits)} undertone"
         else:
-            raise Exception("Unsupported Response Mode")
+            response_style = response_mode.response_style
 
-        prompt_message = prompt_message.format(self.character, response_style, self.max_response_size)
+        prompt_message = prompt_message.format(self.character_settings.character_name, response_style, self.max_response_size)
         return prompt_message
 
-    def getResponse(self, user_text):
+    def getResponse(self, user_text, chat_history = None):
+        if chat_history != None and len(chat_history) != 0:
+            print("CHAT HISTORY PARAM:")
+            print(chat_history)
+
+            temp_history = self.chat_history
+            self.resetChatHistory()
+            self.chat_history += chat_history
+            response = self.getResponse(user_text)
+            self.chat_history = temp_history
+            return response
+
         rand_response_mode = self.getRandomResponseMode()
+        print("RESPONSE MODE: " + rand_response_mode.name)
         rand_prompt_message = self.getRandomPromptMessage(rand_response_mode)
         self.updateResponseMode(rand_prompt_message)
         user_message = {"role": "user", "content": user_text}
