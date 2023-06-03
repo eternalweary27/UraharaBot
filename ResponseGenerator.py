@@ -41,35 +41,31 @@ class AICharacterResponseGenerator:
         return random.choice(all_response_modes)
 
     def getRandomPromptMessage(self, response_mode):
-        prompt_message = "Respond to all following messages as if you were {}. Respond {}. Keep the responses to a maximum of {} characters."
+        prompt_message = "Respond to all following messages as if you were {}. {}. Keep the responses to a maximum of {} characters."
         response_style = None
         if response_mode.name == "Chat":
-            response_style = f"in a {random.choice(self.character_settings.primary_traits)} way with a {random.choice(self.character_settings.secondary_traits)} undertone"
+            response_style = f"Respond in a {random.choice(self.character_settings.primary_traits)} way with a {random.choice(self.character_settings.secondary_traits)} undertone"
         else:
             response_style = response_mode.response_style
 
         prompt_message = prompt_message.format(self.character_settings.character_name, response_style, self.max_response_size)
         return prompt_message
+    
+    def printResponseDetails(self, response_mode):
+        print("RESPONSE MODE: " + response_mode.name)
+        print("CHAT HISTORY:\n " + str(self.chat_history))
 
     def getResponse(self, user_text, chat_history = None):
-        if chat_history != None and len(chat_history) != 0:
-            print("CHAT HISTORY PARAM:")
-            print(chat_history)
-
-            temp_history = self.chat_history
-            self.resetChatHistory()
-            self.chat_history += chat_history
-            response = self.getResponse(user_text)
-            self.chat_history = temp_history
-            return response
+        self.resetChatHistory()
+        if chat_history != None and len(chat_history) > 0:
+            self.chat_history += chat_history[0:-1]
 
         rand_response_mode = self.getRandomResponseMode()
-        print("RESPONSE MODE: " + rand_response_mode.name)
         rand_prompt_message = self.getRandomPromptMessage(rand_response_mode)
         self.updateResponseMode(rand_prompt_message)
         user_message = {"role": "user", "content": user_text}
         self.chat_history.append(user_message)
         response = openai.ChatCompletion.create(model=self.model,messages=self.chat_history)
-        assistant_message = {"role": "assistant", "content": response.choices[0].message.content}
-        self.chat_history.append(assistant_message)
+        self.printResponseDetails(rand_response_mode)
         return response
+    
