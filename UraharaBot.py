@@ -1,11 +1,10 @@
 from ResponseGenerator import ResponseMode, CharacterSettings, AICharacterResponseGenerator
-from GeneralCharacterBot import QuarantineSettings, SubRedditSettings, DebugSettings, PostFanartSettings, CharacterBot
+from GeneralCharacterBot import QuarantineSettings, SubRedditSettings, DebugSettings, PostFanartSettings, EmailSettings, CharacterBot
 
 BOTINVOKE_WORDS = ["uraharabot", "urahara bot"] #these words are used to directly invoke the bot
 KEY_WORDS = ["urahara","kisuke"] #bot will appear if user mentions these words and comment limit has not been reached
 QUOTES_FILENAME = "urahara_quotes.txt"
 FACTS_FILENAME = "urahara_facts.txt"
-RUN_TIME = -1
 NO_SUBMISSIONS = 30
 BOT_TAG = "*beep boop, I'm a bot*"
 
@@ -15,9 +14,9 @@ URAHARA_CHARACTER_SETTINGS = CharacterSettings(
     secondary_traits= ["cheerful", "sinister", "mysterious", "dark", "sarcastic", "facetious", "laid-back", "optimistic", "chaotic", "unhinged"],
     response_modes = [
         ResponseMode("Chat", None, 25),
-        ResponseMode("Joke", "with a relevant joke", 25),
-        ResponseMode("Fact", "with a fun and relevant fact or trivia", 25),
-        ResponseMode("SalesPitch", "with a relevant sales pitch", 25)
+        ResponseMode("Joke", "Respond with a relevant joke", 25),
+        ResponseMode("Fact", "Respond with a fun and relevant fact or trivia", 25),
+        ResponseMode("SalesPitch", "Respond with a relevant sales pitch", 25)
     ]
 )
 
@@ -36,8 +35,8 @@ QUARANTINE_SETTINGS = QuarantineSettings(
 SUBREDDITS = [
     SubRedditSettings("bleach", KEY_WORDS, 3, 20),
     SubRedditSettings("TheBleachfolk", KEY_WORDS, 3, 20),
-    SubRedditSettings("BleachMemes", KEY_WORDS, 2, 20),
-    SubRedditSettings("BleachBraveSouls", KEY_WORDS, 1, 20)
+    SubRedditSettings("BleachBraveSouls", KEY_WORDS, 1, 20),
+    SubRedditSettings("DefaultSettings", ["Urahara Kisuke", "Kisuke Urahara"],2,20)
 ]
 
 DEBUG_SETTINGS = DebugSettings(
@@ -52,6 +51,13 @@ POST_FANART_SETTINGS = PostFanartSettings(
     post_title = "Daily Dose of Urahara"
 )
 
+EMAIL_SETTINGS = EmailSettings(
+    sender_address=None, #replace with your own gmail details
+    receiver_address=None,
+    password = None,
+    email_frequency=3600*4
+)
+
 uraharaBot = CharacterBot(
     botinvoke_words= BOTINVOKE_WORDS,
     character_response_generator=URAHARA_AI_RESPONSE_GENERATOR,
@@ -60,9 +66,9 @@ uraharaBot = CharacterBot(
     quarantine_settings=QUARANTINE_SETTINGS,
     subreddits=SUBREDDITS,
     debug_settings=DEBUG_SETTINGS,
-    run_time=RUN_TIME,
     no_submissions=NO_SUBMISSIONS,
     post_fanart_settings=POST_FANART_SETTINGS,
+    email_settings=EMAIL_SETTINGS,
     bot_tag=BOT_TAG
 )
 
