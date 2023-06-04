@@ -459,7 +459,6 @@ class CharacterBot:
                 if len(seconds_elapsed) == 1:
                     seconds_elapsed = "0" + seconds_elapsed
                 time_str = minutes_elapsed + ":" + seconds_elapsed
-                print("VISITED DICT: " + str(self.visited))
                 comments_made = len([i for i in self.visited if self.visited[i] == 1])
                 self.printInfo(["Routine Update:", "Comments made over the last {} minutes: {}".format(time_str, comments_made)])
                 last_update = time.perf_counter()
