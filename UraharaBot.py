@@ -1,8 +1,9 @@
-from ResponseGenerator import ResponseMode, CharacterSettings, AICharacterResponseGenerator
+from ResponseGenerator import ResponseMode, CharacterSettings, ImageGeneratorSettings, AICharacterResponseGenerator
 from GeneralCharacterBot import QuarantineSettings, SubRedditSettings, DebugSettings, PostFanartSettings, EmailSettings, CharacterBot
 
 BOTINVOKE_WORDS = ["uraharabot", "urahara bot"] #these words are used to directly invoke the bot
 KEY_WORDS = ["urahara","kisuke"] #bot will appear if user mentions these words and comment limit has not been reached
+IMAGE_REQUEST_WORDS = ["draw a picture", "draw picture", "create an image", "create a image", "create image"]
 QUOTES_FILENAME = "urahara_quotes.txt"
 FACTS_FILENAME = "urahara_facts.txt"
 NO_SUBMISSIONS = 30
@@ -13,21 +14,29 @@ URAHARA_CHARACTER_SETTINGS = CharacterSettings(
     primary_traits= ["goofy and witty", "comical and clever", "wacky and eccentric", "deriding and taunting", "silly and ridiculous", "snarky and playful"],
     secondary_traits= ["cheerful", "sinister", "mysterious", "dark", "sarcastic", "facetious", "laid-back", "optimistic", "chaotic", "unhinged"],
     response_modes = [
-        ResponseMode("Chat", None, 25),
-        ResponseMode("Joke", "Respond with a relevant joke", 25),
-        ResponseMode("Fact", "Respond with a fun and relevant fact or trivia", 25),
-        ResponseMode("SalesPitch", "Respond with a relevant sales pitch", 25)
+        ResponseMode("Chat", None, 25 * 4),
+        ResponseMode("Joke", "Respond with a relevant joke", 25 * 2),
+        ResponseMode("Fact", "Respond with a relevant fact or trivia", 25),
+        ResponseMode("SalesPitch", "Respond with a relevant sales pitch", 25 * 2)
     ]
+)
+
+URAHARA_IMAGE_GENERATOR_SETTINGS = ImageGeneratorSettings(
+    model = "dall-e-3",
+    resolution = "1024x1024",
+    quality="standard"
 )
 
 URAHARA_AI_RESPONSE_GENERATOR = AICharacterResponseGenerator(
     model = "gpt-3.5-turbo",
     character_settings=URAHARA_CHARACTER_SETTINGS,
+    image_generator_settings=URAHARA_IMAGE_GENERATOR_SETTINGS,
     max_response_size=210
 )
 
 QUARANTINE_SETTINGS = QuarantineSettings(
     blacklisted_words_filename = "blacklist.txt",
+    image_blacklisted_words_filename="image_blacklist.txt",
     quarantined_users_filename = "quarantined_users.txt",
     quarantine_time = 3600 * 24 * 5
 )
@@ -60,6 +69,7 @@ EMAIL_SETTINGS = EmailSettings(
 
 uraharaBot = CharacterBot(
     botinvoke_words= BOTINVOKE_WORDS,
+    imagerequest_words= IMAGE_REQUEST_WORDS,
     character_response_generator=URAHARA_AI_RESPONSE_GENERATOR,
     quotes_filename=QUOTES_FILENAME,
     facts_filename=FACTS_FILENAME,
@@ -71,4 +81,3 @@ uraharaBot = CharacterBot(
     email_settings=EMAIL_SETTINGS,
     bot_tag=BOT_TAG
 )
-

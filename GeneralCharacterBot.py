@@ -7,13 +7,15 @@ import traceback
 import praw
 import smtplib
 import ssl
+import string
 from email.message import EmailMessage
 
 from readwrite_bot import reddit
 
 class QuarantineSettings:
-    def __init__(self, blacklisted_words_filename, quarantined_users_filename, quarantine_time):
+    def __init__(self, blacklisted_words_filename, image_blacklisted_words_filename, quarantined_users_filename, quarantine_time):
         self.blacklisted_words_filename = blacklisted_words_filename
+        self.image_blacklisted_words_filename = image_blacklisted_words_filename
         self.quarantined_users_filename = quarantined_users_filename
         self.quarantine_time = quarantine_time
 
@@ -147,8 +149,9 @@ class PRAWUtilities:
 
 
 class CharacterBot:
-    def __init__(self, botinvoke_words, character_response_generator, quotes_filename, facts_filename, quarantine_settings, subreddits, debug_settings, no_submissions, post_fanart_settings, email_settings, bot_tag):
+    def __init__(self, botinvoke_words, imagerequest_words, character_response_generator, quotes_filename, facts_filename, quarantine_settings, subreddits, debug_settings, no_submissions, post_fanart_settings, email_settings, bot_tag):
         self.botinvoke_words = botinvoke_words
+        self.imagerequest_words = imagerequest_words
         self.character_response_generator = character_response_generator
         self.quotes_filename = quotes_filename
         self.facts_filename = facts_filename 
@@ -198,6 +201,8 @@ class CharacterBot:
         self.ALL_QUOTES =  self.getAllLines(self.quotes_filename)
         self.ALL_FACTS = self.getAllLines(self.facts_filename)
         self.ALL_BLACKLISTED_WORDS = self.getAllLines(self.quarantine_settings.blacklisted_words_filename)
+        self.ALL_IMAGE_BLACKLISTED_WORDS = self.getAllLines(self.quarantine_settings.image_blacklisted_words_filename)
+
 
         if (not any([filename == self.quarantine_settings.quarantined_users_filename for filename in os.listdir()])):
             with open(self.quarantine_settings.quarantined_users_filename, mode ="w") as write_file:
@@ -209,14 +214,15 @@ class CharacterBot:
         key_words = subreddit_setting.key_words
         return any([word in text.lower() for word in key_words])
     
-    def isBotInvokeText(self, item):
-        text = self.PRAW_utils.extractText(item).lower()
+    def isBotInvokeText(self, text):
         return any([word in text.lower() for word in self.botinvoke_words])
     
-    def isSafeText(self, item):
-        user_text = self.PRAW_utils.extractText(item).lower()
-        user_text = "".join(char for char in user_text if char.isalpha() or char in " ")
-        for word in self.ALL_BLACKLISTED_WORDS:
+    def isImageRequestText(self, text):
+        return any([word in text.lower() for word in self.imagerequest_words])
+    
+    def isSafeText(self, text, blacklist_arr):
+        user_text = "".join(char for char in text if char.isalpha() or char in " ")
+        for word in blacklist_arr:
             if len(word.split()) > 1 and word in user_text.lower():
                 return False
 
@@ -283,8 +289,8 @@ class CharacterBot:
         api_call_failed = False
         try:
             AIResponse = self.character_response_generator.getResponse(user_text, chat_history)
-            bot_reply = AIResponse['choices'][0]['message']['content']
-            api_call_failed = AIResponse['choices'][0]['finish_reason'] != 'stop'
+            bot_reply = AIResponse.choices[0].message.content
+            api_call_failed = AIResponse.choices[0].finish_reason != 'stop'
         except:
             api_call_failed = True
             traceback.print_exc()
@@ -309,7 +315,44 @@ class CharacterBot:
             bot_reply = random.choice(self.ALL_FACTS)
         return bot_reply
     
+    def getPreviewURL(self, prompt, author_name):
+        preview_link = None
+        image_data = self.character_response_generator.getImageData(prompt)
+
+        if image_data:
+            filename = prompt.replace("draw","").replace("create","").lstrip().rstrip()
+            image_path = f"./requested_images/{filename}.png"
+            with open(image_path, mode="wb") as read_file:
+                read_file.write(image_data)
+                read_file.close()
+
+            submission_name = f'"{filename}" requested by {author_name}'
+            submission = reddit.subreddit("r/uraharabot").submit_image(submission_name, image_path)
+            preview_link = submission.preview['images'][0]['source']['url']
+        return preview_link
+    
+    def getBotImageMessage(self, user_text, author_name):
+        bot_image_message = None
+        start_index = -1
+        if "draw" in user_text:
+            start_index = user_text.find("draw")
+        
+        elif "create" in user_text:
+            start_index = user_text.find("create")
+        
+        if start_index < 0:
+            prompt = user_text
+        else:
+            prompt = user_text[start_index:].lstrip().rstrip()
+        prompt = "".join([i for i in prompt if i not in string.punctuation])
+        preview_link = self.getPreviewURL(prompt, author_name)
+        if preview_link:
+            bot_image_message = f"Image Generated!\n\n[Preview Reddit Link]({preview_link})"
+        return bot_image_message
+    
     def getBotComment(self, item, chat_history = None):
+        text = self.PRAW_utils.extractText(item).lower()
+
         IsVisited = item.id in self.visited
         if IsVisited and not item.edited:
             return None
@@ -324,7 +367,7 @@ class CharacterBot:
             return None
         
         HasTopCommentLimitReached = isinstance(item, praw.models.Comment) and self.PRAW_utils.hasTopCommentLimitReached(item.submission)
-        IsBotInvokeText = self.isBotInvokeText(item)
+        IsBotInvokeText = self.isBotInvokeText(text)
         if HasTopCommentLimitReached and not IsBotInvokeText and not IsNestedComment:
             return None
         
@@ -344,16 +387,30 @@ class CharacterBot:
         if IsUserQuarantined:
             return None
         
-        IsSafeText = self.isSafeText(item)
+        IsSafeText = self.isSafeText(text, self.ALL_BLACKLISTED_WORDS)
         if not IsSafeText and not IsBotInvokeText and not IsNestedComment:
             return None
         
         if not IsSafeText and (IsBotInvokeText or IsNestedComment):
-            self.printInfo(["="*50, f"TEXT SKIPPED: {self.PRAW_utils.extractText(item)}", "="*50])
+            self.printInfo(["="*50, f"TEXT SKIPPED: {text}", "="*50])
             self.updateQuarantinedUsers(item.author)
-            return self.getBotQurantinedUserMessage(item.author)
+            return '{}\n\n{}'.format(self.getBotQurantinedUserMessage(item.author),self.bot_tag)
         
-        bot_reply =  self.getBotMessage(self.PRAW_utils.extractText(item), chat_history)
+        IsImageRequest = self.isImageRequestText(text)
+        if not IsImageRequest:
+            bot_reply =  self.getBotMessage(text, chat_history)
+        else:
+            IsImageSafeText = self.isSafeText(text,self.ALL_IMAGE_BLACKLISTED_WORDS)
+            if not IsImageSafeText:
+                self.printInfo(["="*50, f"TEXT SKIPPED: {text}", "="*50])
+                self.updateQuarantinedUsers(item.author)
+                return '{}\n\n{}'.format(self.getBotQurantinedUserMessage(item.author),self.bot_tag)
+            
+            author_name = "Unknown" if not getattr(item.author, "name", None) else item.author.name
+            bot_reply = self.getBotImageMessage(text, author_name)
+            if not bot_reply:
+                return None
+
         bot_comment = '{}\n\n{}'.format(bot_reply,self.bot_tag)
         return bot_comment
 
@@ -434,7 +491,7 @@ class CharacterBot:
 
         print(self.PRAW_utils.getSubredditsString())
         subreddit = reddit.subreddit(self.PRAW_utils.getSubredditsString())
-        total_no_submissions = self.no_submissions * (len(self.subreddits)-1)
+        total_no_submissions = max(self.no_submissions * (len(self.subreddits)-1), 1)
         while True:
             for submission in subreddit.new(limit = total_no_submissions):
                 bot_comment = self.getBotComment(submission)
