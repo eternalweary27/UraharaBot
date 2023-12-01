@@ -1,7 +1,10 @@
 import openai
 import random
+import requests
 
-openai.api_key = None
+API_KEY = None
+openai.api_key = API_KEY
+client = openai.OpenAI(api_key=API_KEY)
 
 class ResponseMode:
     def __init__(self,name,response_style, probability):
@@ -16,11 +19,17 @@ class CharacterSettings:
         self.secondary_traits = secondary_traits
         self.response_modes = response_modes
 
+class ImageGeneratorSettings:
+    def __init__(self, model, resolution, quality):
+        self.model = model
+        self.resolution = resolution
+        self.quality = quality
 
 class AICharacterResponseGenerator:
-    def __init__(self,model, character_settings, max_response_size):
+    def __init__(self,model, character_settings, image_generator_settings, max_response_size):
         self.model = model
         self.character_settings = character_settings
+        self.image_generator_settings = image_generator_settings
         self.max_response_size = max_response_size
         self.chat_history = []
         self.resetChatHistory()
@@ -65,7 +74,22 @@ class AICharacterResponseGenerator:
         self.updateResponseMode(rand_prompt_message)
         user_message = {"role": "user", "content": user_text}
         self.chat_history.append(user_message)
-        response = openai.ChatCompletion.create(model=self.model,messages=self.chat_history)
+        response = client.chat.completions.create(model=self.model,messages=self.chat_history)
         self.printResponseDetails(rand_response_mode)
         return response
     
+    def getImageData(self,image_prompt):
+        response = client.images.generate(
+            model = self.image_generator_settings.model,
+            prompt = image_prompt,
+            size = self.image_generator_settings.resolution,
+            quality = self.image_generator_settings.quality,
+            n=1,
+        )
+        image_url = response.data[0].url
+        response = requests.get(image_url)
+        image_data = None
+        if response.status_code == 200:
+            print(f"Image Successfully generated prompt - '{image_prompt}'")
+            image_data = response.content
+        return image_data
